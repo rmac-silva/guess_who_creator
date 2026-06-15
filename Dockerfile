@@ -34,4 +34,4 @@ EXPOSE 8000
 
 # FIX 2: Updated the module path to "src.main:app" since your code is in the src directory,
 # and reverted port back to 8000 to match your deploy script mapping!
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python3","src/main.py"]

@@ -6,11 +6,11 @@ services:
     container_name: guesswho_backend
     restart: always
     ports:
-      - "8000:8000"
+      - "8050:8000"
     volumes:
       - db_data:/app/data
     environment:
-      - RUNNING_ON_CONTAINER = true
+      - RUNNING_ON_CONTAINER=true
       - DB_PATH=/app/data/guesswho.db
       - CORS_ORIGINS=https://guesswho.blazy.uk
 
