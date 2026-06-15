@@ -43,7 +43,7 @@ class ImageGuess {
   List<String> guessNames;
   List<String> clues = const [];
 
-  
+  static final RegExp _numericSuffixRegex = RegExp(r'\s*\(\d+\)');
   
   ImageGuess({
     required this.guessId,
@@ -51,7 +51,7 @@ class ImageGuess {
     List<String> guessNames = const [],
     List<String> clues = const [],
     
-  }) : guessNames = guessNames.isEmpty ? [image.name.split('.')[0].replaceAll(RegExp(r'\s*\(\d+\)'), '')] : guessNames, clues = clues.isEmpty ? [] : clues;
+  }) : guessNames = guessNames.isEmpty ? [image.name.split('.')[0].replaceAll(_numericSuffixRegex, '')] : guessNames, clues = clues.isEmpty ? [] : clues;
 
   Map<String, dynamic> toJson(bool hasMultiple, bool hasclues) {
     return {
