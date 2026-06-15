@@ -1,4 +1,4 @@
-name: HypothesizeTheIndividual
+name: guess_who_creator
 description: "Create daily guessing games from your own images."
 publish_to: 'none'
 version: 0.1.0+1
