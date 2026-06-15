@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+# CHANGE THIS LINE: Point Docker to the src folder version
 COPY src/requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
