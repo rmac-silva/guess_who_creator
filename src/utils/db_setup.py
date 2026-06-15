@@ -45,12 +45,13 @@ def create_guesses_table(c : sqlite3.Cursor):
     cmd = """
         CREATE TABLE IF NOT EXISTS guesses (
         gameID TEXT NOT NULL,
-        guess TEXT NOT NULL,
+        possibleGuesses TEXT NOT NULL,
+        clues TEXT NOT NULL,            
         filename TEXT NOT NULL,
         PRIMARY KEY (gameID, filename),
         FOREIGN KEY (gameID) REFERENCES games(gameID) ON DELETE CASCADE,
         FOREIGN KEY (filename) REFERENCES sqlar(name)
-    );
+        );
         """
     
     c.execute(cmd)
