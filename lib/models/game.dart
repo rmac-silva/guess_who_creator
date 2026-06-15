@@ -51,7 +51,7 @@ class ImageGuess {
     List<String> guessNames = const [],
     List<String> clues = const [],
     
-  }) : guessNames = guessNames.isEmpty ? [image.name.split('.')[0]] : guessNames, clues = clues.isEmpty ? [] : clues;
+  }) : guessNames = guessNames.isEmpty ? [image.name.split('.')[0].replaceAll(RegExp(r'\s*\(\d+\)'), '')] : guessNames, clues = clues.isEmpty ? [] : clues;
 
   Map<String, dynamic> toJson(bool hasMultiple, bool hasclues) {
     return {
