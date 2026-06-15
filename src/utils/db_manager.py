@@ -74,24 +74,6 @@ class DatabaseManager:
             time.sleep(backup_interval)
 
     def create_new_game(self, data: dict) -> tuple[str, str]:
-        """Creates a new game
-
-        Args:
-            data (dict): {
-                gameName : str,
-                authorEmail : str,
-                availableGuesses : [
-                    guessId : str,
-                    'image' :  {
-                        'name' : str,
-                        'bytes' : bytes
-                    }
-                    guessNames : [str],
-                    clues : []
-                ]
-            }
-        """
-
         gameName = data.get("gameName", "")
         authorEmail = data.get("authorEmail", "")
         available_guesses = data.get("availableGuesses", [])
@@ -103,7 +85,6 @@ class DatabaseManager:
         print(f'Creating a new game "{gameName}", from "{authorEmail}" with {len(available_guesses)} guesses.\nWith ID {game_id}')
 
         try:
-
             c.execute(
                 """
                 INSERT INTO games (gameID, title, email, lastPlayed)
@@ -113,22 +94,27 @@ class DatabaseManager:
             )
 
             for guess in available_guesses:
-                possible_guesses = guess.get("guessNames", [])
-                game_clues = guess.get("clues",[])
-                print(f"New game - This guess has {len(possible_guesses)} correct answers. And it has {len(game_clues)} clues\n")
                 image_data = guess.get("image", {})
+                
+                # --- FIX: Skip empty metadata items during Phase 1 ---
+                if not image_data or "name" not in image_data or "bytes" not in image_data:
+                    print("Skipping incomplete guess data payload (Phase 1 initialization block)")
+                    continue
+
+                possible_guesses = guess.get("guessNames", [])
+                game_clues = guess.get("clues", [])
+                print(f"New game - This guess has {len(possible_guesses)} correct answers. And it has {len(game_clues)} clues\n")
 
                 filename = image_data.get("name", "image.png")
                 b64_string = image_data.get("bytes", "")
 
                 image_bytes = base64.b64decode(b64_string)
-
-                # Ensure the sqlar path is always different
                 storage_path = f"{game_id}/{filename}"
 
+                # Use INSERT OR REPLACE to double-protect against duplicate asset names down the road
                 c.execute(
                     """
-                    INSERT INTO sqlar (name, mode, mtime, sz, data)
+                    INSERT OR REPLACE INTO sqlar (name, mode, mtime, sz, data)
                     VALUES (?,?,?,?,?)
                     """,
                     (storage_path, 33188, int(time.time()), len(image_bytes), image_bytes),
@@ -136,15 +122,16 @@ class DatabaseManager:
 
                 c.execute(
                     """
-                    INSERT INTO guesses (gameID, possibleGuesses, clues, filename)
+                    INSERT OR REPLACE INTO guesses (gameID, possibleGuesses, clues, filename)
                     VALUES(?,?,?,?)
                     """,
                     (game_id, json.dumps(possible_guesses), json.dumps(game_clues), storage_path),
                 )
 
-                print("\nGame created successfuly")
-                c.commit()
-
+                print("\nGame item mapped successfully")
+                
+            # Commit the transaction once the loop completes (even if it skipped everything)
+            c.commit()
             return ("200", game_id)
 
         except Exception as e:

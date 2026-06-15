@@ -29,7 +29,7 @@ docker run -d \
   -e RUNNING_ON_CONTAINER=true \
   -e DB_PATH=/app/data/guesswho.db \
   -e CORS_ORIGINS=https://guesswho.blazy.uk \
-  -p 8000:8000 \
+  -p 8050:8000 \
   --restart unless-stopped \
   $IMAGE_NAME
 
