@@ -63,7 +63,20 @@ def fetch_daily_game(gameid : str):
     else:
         raise HTTPException(status_code=500,detail=res[1])
     
-
+@app.post("/game/{gameid}/upload-guesses")
+def upload_game_guesses(gameid: str, data: dict):
+    lg.log(f"@POST [/game/{gameid}/upload-guesses] - Appending batch of guesses to game {gameid}")
+    
+    # Process the chunk of guesses via the database manager
+    res = db.add_guesses_to_game(gameid, data.get("guesses", []))
+    
+    if res[0] == "200":
+        return {"status": "200", "message": res[1], "error": ""}
+    elif res[0] == "404":
+        raise HTTPException(status_code=404, detail=res[1])
+    else:
+        raise HTTPException(status_code=500, detail=res[1])
+    
 def find_ip():
     import socket
 

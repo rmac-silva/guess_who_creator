@@ -251,3 +251,71 @@ class DatabaseManager:
             conn.rollback()
         finally:
             conn.close()
+
+    def add_guesses_to_game(self, game_id: str, guesses_chunk: list) -> tuple[str, str]:
+        """Appends a chunk of guesses and image payloads to an existing game ID safely.
+        
+        Args:
+            game_id (str): Target game key
+            guesses_chunk (list): [
+                {
+                    'image': {'name': str, 'bytes': str},
+                    'guessNames': [str],
+                    'clues': []
+                }
+            ]
+        """
+        import sqlite3
+        import base64
+        import json
+        import time
+
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                c = conn.cursor()
+                
+                # Verify that the parent game actually exists first
+                c.execute("SELECT gameID FROM games WHERE gameID = ?", (game_id,))
+                if not c.fetchone():
+                    return ("404", f"Game ID {game_id} not found.")
+
+                print(f"Uploading batch of {len(guesses_chunk)} assets for Game ID: {game_id}")
+
+                for guess in guesses_chunk:
+                    possible_guesses = guess.get("guessNames", [])
+                    game_clues = guess.get("clues", [])
+                    image_data = guess.get("image", {})
+
+                    filename = image_data.get("name", "image.png")
+                    b64_string = image_data.get("bytes", "")
+
+                    if not b64_string:
+                        continue # Skip entry if it accidentally missing raw byte streams
+
+                    # Unpack base64 payload to binary data
+                    image_bytes = base64.b64decode(b64_string)
+                    storage_path = f"{game_id}/{filename}"
+
+                    # Insert image bytes directly into sqlar blob storage
+                    c.execute(
+                        """
+                        INSERT OR REPLACE INTO sqlar (name, mode, mtime, sz, data)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (storage_path, 33188, int(time.time()), len(image_bytes), image_bytes),
+                    )
+
+                    # Insert cross reference into guesses mapping table
+                    c.execute(
+                        """
+                        INSERT OR REPLACE INTO guesses (gameID, possibleGuesses, clues, filename)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (game_id, json.dumps(possible_guesses), json.dumps(game_clues), storage_path),
+                    )
+
+                conn.commit()
+                return ("200", f"Successfully appended {len(guesses_chunk)} assets.")
+
+        except Exception as e:
+            return ("500", f"Database batch upload failed: {e}")

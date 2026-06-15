@@ -26,7 +26,7 @@ ENV PATH="/root/.local/bin:${PATH}"
 
 ENV RUNNING_ON_CONTAINER=true
 ENV DB_PATH=/app/data/guesswho.db
-ENV CORS_ORIGIN=https://guesswho.blazy.uk
+ENV CORS_ORIGINS=https://guesswho.blazy.uk
 
 RUN mkdir -p /app/data
 

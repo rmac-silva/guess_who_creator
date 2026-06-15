@@ -24,14 +24,14 @@ class ImageUploadViewModel extends ChangeNotifier {
   bool get isUploading => game.availableGuesses.any(
     (entry) => entry.image.status == UploadStatus.uploading,
   );
-  
+
   bool get hasUnlabeledImages => game.availableGuesses.any((entry) {
-      // 1. Invalid if the list itself is completely empty
-      if (entry.guessNames.isEmpty) return true;
-      
-      // 2. Invalid if any individual text field contains only whitespace or is empty
-      return entry.guessNames.any((name) => name.trim().isEmpty);
-    });
+    // 1. Invalid if the list itself is completely empty
+    if (entry.guessNames.isEmpty) return true;
+
+    // 2. Invalid if any individual text field contains only whitespace or is empty
+    return entry.guessNames.any((name) => name.trim().isEmpty);
+  });
 
   // 1. Pick Multiple Images from Device
   Future<void> pickImages() async {
@@ -76,49 +76,75 @@ class ImageUploadViewModel extends ChangeNotifier {
 
     game.authorEmail = email;
 
+    // Mark all entries as uploading initially
     for (var entry in game.availableGuesses) {
       if (entry.image.status != UploadStatus.success) {
         entry.image.status = UploadStatus.uploading;
       }
     }
-
     notifyListeners();
 
     try {
       final String baseUrl = AppConfig.apiUrl;
-      final Uri url = Uri.parse('$baseUrl/game/new');
 
-      //Updating the flags for the model
+      // --- PHASE 1: Initialize the Game Meta-Record (No images) ---
+      final Uri initUrl = Uri.parse('$baseUrl/game/new');
+
       game.hasClues = _hasHints;
       game.hasMultipleGuesses = _hasMultipleGuesses;
 
-      final response = await http.post(
-        url,
+      final initResponse = await http.post(
+        initUrl,
         headers: {'Content-Type': 'application/json'},
-        body: game.jsonify(), // Uses the method we created earlier
+        // Cleanly pass includeImages: false here to drop the heavy base64 payload strings
+        body: game.jsonify(includeImages: false),
       );
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
+      if (initResponse.statusCode != 200) {
+        throw Exception(_parseServerError(initResponse));
+      }
 
-        // Extract the real game ID sent by your FastAPI backend
-        _gameID = responseData['gameId'] ?? "fallback_id";
+      final Map<String, dynamic> responseData = jsonDecode(initResponse.body);
+      _gameID = responseData['gameId'] ?? "fallback_id";
 
-        // Mark all uploads as successful
-        for (var entry in game.availableGuesses) {
-          entry.image.status = UploadStatus.success;
+      // --- PHASE 2: Upload Guess Cards in Batches of 50 ---
+      final int chunkSize = 50;
+      final int totalGuesses = game.availableGuesses.length;
+
+      for (var i = 0; i < totalGuesses; i += chunkSize) {
+        // Isolate our current slice block
+        final int endRange = (i + chunkSize > totalGuesses)
+            ? totalGuesses
+            : i + chunkSize;
+        final chunk = game.availableGuesses.sublist(i, endRange);
+
+        // Serialize just this current index chunk (includes full base64 image data)
+        final Map<String, dynamic> batchPayload = {
+          "guesses": chunk
+              .map((guess) => guess.toJson(_hasMultipleGuesses, _hasHints))
+              .toList(),
+        };
+
+        final Uri batchUrl = Uri.parse('$baseUrl/game/$_gameID/upload-guesses');
+
+        final batchResponse = await http.post(
+          batchUrl,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(batchPayload),
+        );
+
+        if (batchResponse.statusCode == 200) {
+          // Incrementally mark uploaded items in this slice block as successful
+          for (var entry in chunk) {
+            entry.image.status = UploadStatus.success;
+          }
+          notifyListeners(); // Updates UI to show these 50 are done!
+        } else {
+          throw Exception(_parseServerError(batchResponse));
         }
-      } else {
-        String errorDetail = "Server error";
-        try {
-          final errorData = jsonDecode(response.body);
-          errorDetail = errorData['detail'] ?? response.body;
-        } catch (_) {
-          errorDetail = "Status ${response.statusCode}: ${response.body}";
-        }
-        throw Exception(errorDetail);
       }
     } catch (e) {
+      // If anything fails anywhere in Phase 1 or Phase 2, catch it and set errors flag
       for (var entry in game.availableGuesses) {
         if (entry.image.status == UploadStatus.uploading) {
           entry.image.status = UploadStatus.error;
@@ -126,7 +152,7 @@ class ImageUploadViewModel extends ChangeNotifier {
         }
       }
       notifyListeners();
-      throw Exception('Server returned status code: ${e.toString()}');
+      throw Exception('Upload Failed: ${e.toString()}');
     }
 
     var templateMessage = email.isEmpty
@@ -134,8 +160,17 @@ class ImageUploadViewModel extends ChangeNotifier {
         : "You can now access your created game through the provided link.\nThe link was also sent to your email.\nGames that see no activity for a week are automatically deleted.";
 
     _generatedMessage = templateMessage;
-
     return true;
+  }
+
+  /// Helper method to cleanly extract system errors from failed requests
+  String _parseServerError(http.Response response) {
+    try {
+      final errorData = jsonDecode(response.body);
+      return errorData['detail'] ?? response.body;
+    } catch (_) {
+      return "Status ${response.statusCode}: ${response.body}";
+    }
   }
 
   // 3. Remove an image from the list
@@ -180,15 +215,11 @@ class ImageUploadViewModel extends ChangeNotifier {
 
   void toggleHints(bool value) {
     _hasHints = value;
-
-    
   }
 
   void toggleMultipleGuesses(bool value) {
     _hasMultipleGuesses = value;
 
-    if(value == false) {
-      
-    }
+    if (value == false) {}
   }
 }

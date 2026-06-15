@@ -23,17 +23,20 @@ class NewGuessingGame {
 
   NewGuessingGame();
 
-  Map<String, dynamic> toJson() {
+  // 1. Added an optional includeImages parameter (defaults to true)
+  Map<String, dynamic> toJson({bool includeImages = true}) {
     return {
       'gameName' : gameName,
       'authorEmail' : authorEmail ?? "",
-      'availableGuesses' : availableGuesses.map( (guess) => guess.toJson(hasMultipleGuesses, hasClues)).toList()
+      'availableGuesses' : availableGuesses.map(
+        (guess) => guess.toJson(hasMultipleGuesses, hasClues, includeImages: includeImages)
+      ).toList()
     };
   }
 
-
-  String jsonify() {
-    return jsonEncode(toJson());
+  // 2. Forward the parameter to jsonify
+  String jsonify({bool includeImages = true}) {
+    return jsonEncode(toJson(includeImages: includeImages));
   }
 }
 
@@ -50,24 +53,26 @@ class ImageGuess {
     required this.image,
     List<String> guessNames = const [],
     List<String> clues = const [],
-    
-  }) : guessNames = guessNames.isEmpty ? [image.name.split('.')[0].replaceAll(_numericSuffixRegex, '')] : guessNames, clues = clues.isEmpty ? [] : clues;
+  }) : guessNames = guessNames.isEmpty 
+          ? [image.name.split('.')[0].replaceAll(_numericSuffixRegex, '')] 
+          : guessNames, 
+       clues = clues.isEmpty ? [] : clues;
 
-  Map<String, dynamic> toJson(bool hasMultiple, bool hasclues) {
+  // 3. Added includeImages parameter here to conditionalize the 'image' property mapping
+  Map<String, dynamic> toJson(bool hasMultiple, bool hasclues, {bool includeImages = true}) {
     return {
       'guessId' : guessId,
-      'image' : image.toJson(),
+      // If false, it completely omits the heavy inner base64 map structure
+      'image' : includeImages ? image.toJson() : {}, 
       'guessNames' : hasMultiple ? guessNames : [guessNames[0]],
       'clues' : hasclues ? clues : [],
     };
   }
-
 }
 
 class UploadedImageModel {
- 
   final String name;
-  final Uint8List bytes; // Storing bytes ensures it works on iOS, Android, and Web
+  final Uint8List bytes; 
   UploadStatus status;
   String? errorMessage;
 
