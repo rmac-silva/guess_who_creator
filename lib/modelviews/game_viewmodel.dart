@@ -85,14 +85,24 @@ class GameViewModel extends ChangeNotifier {
   }
 
   void addGuess(String guess) {
-    var matchingGuesses = correctAnswers?.firstWhere((entry) => entry == guess);
-    if (matchingGuesses != null && matchingGuesses.isNotEmpty) {
-      _wonGame = true;
-    }
+  // 1. Safe, case-insensitive evaluation using lowercased and trimmed values
+  final cleanedGuess = guess.trim().toLowerCase();
 
-    _previousGuesses.add(guess);
-    notifyListeners();
+  // 2. Use orElse to safely return null if no array element matches
+  final String? matchingGuess = correctAnswers?.firstWhere(
+    (entry) => entry.trim().toLowerCase() == cleanedGuess,
+    orElse: () => "", // Returns an empty string instead of crashing the state loop
+  );
+
+  // If a valid match was found, trigger the win state flag
+  if (matchingGuess != null && matchingGuess.isNotEmpty) {
+    _wonGame = true;
   }
+
+  // Add the original string to history (or cleanedGuess if you prefer standard layouts)
+  _previousGuesses.add(guess);
+  notifyListeners();
+}
 
   void showClue() {
     print("Clicked hint button");
