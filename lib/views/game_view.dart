@@ -69,6 +69,9 @@ class _GameViewState extends State<GameView> {
     final Size screenSize = MediaQuery.of(context).size;
     final themeProvider = ThemeProvider.of(context);
 
+    // 1. Establish your responsive layout flag
+    final bool isLargeScreen = screenSize.width > 768;
+
     return ListenableBuilder(
       listenable: _viewModel,
       builder: (context, child) {
@@ -77,15 +80,11 @@ class _GameViewState extends State<GameView> {
             title: Text(_viewModel.gameTitle ?? ""),
             actions: [
               GameHintButton(
-                onTap: () {
-                  // Trigger your game view model hint counter or unlock mechanism here
-                  _viewModel.showClue();
-                },
+                onTap: () => _viewModel.showClue(),
                 disabled: !_viewModel.hasNextClue(),
               ),
               ThemeSwitch(
                 value: themeProvider.isDarkMode,
-
                 onChanged: themeProvider.onThemeChanged,
               ),
             ],
@@ -111,69 +110,72 @@ class _GameViewState extends State<GameView> {
                               child: CircularProgressIndicator(),
                             ),
                           )
-                        : Column(
-                            spacing: 0,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  // LEFT SIDE PANEL
-                                  Expanded(
-                                    flex: 1,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxHeight: screenSize.height * 0.81,
-                                        ),
-                                        child: PreviousGuessesWidget(
-                                          correctGuesses:
-                                              _viewModel.correctAnswers ?? [],
-                                          guesses: _viewModel.previousGuesses,
-                                        ),
+                        : Padding(
+                            // Add universal core container padding
+                            padding: const EdgeInsets.all(16.0),
+                            // 2. Use a Flex layout. Stacks vertically on mobile, horizontally on desktop!
+                            child: Flex(
+                              direction: isLargeScreen
+                                  ? Axis.horizontal
+                                  : Axis.vertical,
+                              crossAxisAlignment: isLargeScreen
+                                  ? CrossAxisAlignment.start
+                                  : CrossAxisAlignment.center,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              // Tighten spaces up between vertical elements on mobile
+                              spacing: isLargeScreen ? 0 : 20,
+                              children: [
+                                // --- PREVIOUS GUESSES PANEL ---
+                                _buildResponsivePanel(
+                                  isLargeScreen: isLargeScreen,
+                                  flex: 1,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      // Give it a fixed height boundary on mobile so it scrolls cleanly
+                                      maxHeight: isLargeScreen
+                                          ? screenSize.height * 0.81
+                                          : 180,
+                                    ),
+                                    child: PreviousGuessesWidget(
+                                      correctGuesses:
+                                          _viewModel.correctAnswers ?? [],
+                                      guesses: _viewModel.previousGuesses,
+                                    ),
+                                  ),
+                                ),
+
+                                // --- CORE GAME MAIN INTERFACE ---
+                                _buildResponsivePanel(
+                                  isLargeScreen: isLargeScreen,
+                                  flex: 2,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      GameImageView(image: _viewModel.image),
+                                      const SizedBox(height: 24),
+                                      GuessInputField(
+                                        onGuessSubmitted: (newGuess) {
+                                          _viewModel.addGuess(newGuess);
+                                        },
+                                        gameIsWon: _viewModel.wonGame,
                                       ),
-                                    ),
+                                    ],
                                   ),
+                                ),
 
-                                  // RIGHT SIDE PANEL
-                                  Expanded(
-                                    flex: 2,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          // Extracted Image Component
-                                          GameImageView(
-                                            image: _viewModel.image,
-                                          ),
-                                          const SizedBox(height: 24),
-
-                                          // Extracted Input Component
-                                          GuessInputField(
-                                            onGuessSubmitted: (newGuess) {
-                                              _viewModel.addGuess(newGuess);
-                                            },
-                                            gameIsWon: _viewModel.wonGame,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
+                                // --- GAME CLUES PANEL ---
+                                _buildResponsivePanel(
+                                  isLargeScreen: isLargeScreen,
+                                  flex: 1,
+                                  child: GameCluesDisplay(
+                                    clues: _viewModel.clues ?? [],
+                                    clueIndex: _viewModel.clueIndex,
                                   ),
-
-                                  Expanded(
-                                    flex:
-                                        1, // Takes up remaining 25% of screen width
-                                    child: GameCluesDisplay(
-                                      clues: _viewModel.clues ?? [],
-                                      clueIndex: _viewModel.clueIndex,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                ),
+                              ],
+                            ),
                           ),
                   ),
                 ),
@@ -200,6 +202,28 @@ class _GameViewState extends State<GameView> {
         );
       },
     );
+  }
+
+  // 3. Helper layout adapter method
+  Widget _buildResponsivePanel({
+    required bool isLargeScreen,
+    required int flex,
+    required Widget child,
+  }) {
+    if (isLargeScreen) {
+      return Expanded(
+        flex: flex,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          key:
+              UniqueKey(), // Forces fresh calculation constraints on screen resize
+          child: child,
+        ),
+      );
+    }
+
+    // On Mobile, remove Expanded wraps completely so components expand to fill 100% device width
+    return SizedBox(width: double.infinity, child: child);
   }
 }
 
@@ -242,11 +266,12 @@ class _PreviousGuessesState extends State<PreviousGuessesWidget> {
           final guess = widget.guesses[reversedIndex];
 
           final isLatestGuess = (index == 0);
-          final isCorrectGuess =
-              (index == 0 &&
-              widget.correctGuesses
-                  .firstWhere((entry) => entry == guess)
-                  .isNotEmpty);
+          
+          final cleanedGuess = guess.trim().toLowerCase();
+          final isCorrectGuess = (index == 0 &&
+              widget.correctGuesses.any(
+                (entry) => entry.trim().toLowerCase() == cleanedGuess,
+              ));
 
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
