@@ -193,7 +193,7 @@ class _GameViewState extends State<GameView> {
                         ? darkTheme.dividerColor
                         : lightTheme.dividerColor,
                     alignment: Alignment.center,
-                    child: LinkFooter(),
+                    child: LinkFooter(gamePage: true,),
                   ),
                 ),
               ],

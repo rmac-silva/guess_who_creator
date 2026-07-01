@@ -66,7 +66,7 @@ class NewGamePage extends StatelessWidget {
                     ? darkTheme.dividerColor
                     : lightTheme.dividerColor,
                 alignment: Alignment.center,
-                child: LinkFooter(),
+                child: LinkFooter(gamePage: false),
               ),
             ),
           ],
